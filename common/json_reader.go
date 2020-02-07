@@ -31,6 +31,10 @@ type JsonDelimiter struct {
 	opposite         *JsonDelimiter
 }
 
+func (delim JsonDelimiter) String() string {
+	return delim.value
+}
+
 func init() {
 	DelimiterObjectStart = &JsonDelimiter{
 		value:            "{",
