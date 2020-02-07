@@ -2,11 +2,21 @@ package storage
 
 import (
 	"context"
+	"github.com/aws/aws-sdk-go/aws/session"
 	"time"
 	"webhooks/common/data"
 )
 
+func NewS3Store(awsSession *session.Session, bucket string) Store {
+	return s3Storage{
+		session: awsSession,
+		bucket:  bucket,
+	}
+}
+
 type s3Storage struct {
+	session *session.Session
+	bucket  string
 }
 
 func (s s3Storage) Put(ctx context.Context, data []*data.WebHookObject) error {

@@ -1,36 +1,37 @@
-package data
+package common
 
 import (
 	"context"
 	"fmt"
 	"sync"
 	"time"
+	"webhooks/common/data"
 	"webhooks/common/storage"
 )
 
 // collects data and groups it in batches based on the maxBufferSize and flushTimeout config options
-func NewDataBuffer(store storage.Store, maxBufferSize int, flushTimeout time.Duration) *Buffer {
-	return &Buffer{
+func NewObjectBuffer(store storage.Store, maxBufferSize int, flushTimeout time.Duration) *ObjectBuffer {
+	return &ObjectBuffer{
 		flushChan:     make(chan struct{}, 1),
 		closeChan:     make(chan struct{}, 1),
-		inChan:        make(chan *WebHookObject),
+		inChan:        make(chan *data.WebHookObject),
 		storage:       store,
 		flushTimeout:  flushTimeout,
 		maxBufferSize: maxBufferSize,
 	}
 }
 
-type Buffer struct {
+type ObjectBuffer struct {
 	flushChan     chan struct{}
 	closeChan     chan struct{}
 	runOnce       sync.Once
-	inChan        chan *WebHookObject
+	inChan        chan *data.WebHookObject
 	storage       storage.Store
 	flushTimeout  time.Duration
 	maxBufferSize int
 }
 
-func (b *Buffer) run() *Buffer {
+func (b *ObjectBuffer) run() *ObjectBuffer {
 	b.runOnce.Do(func() {
 		go func() {
 
@@ -42,7 +43,7 @@ func (b *Buffer) run() *Buffer {
 
 			flushTicker := time.NewTicker(b.flushTimeout)
 
-			pending := make([]*WebHookObject, 0)
+			pending := make([]*data.WebHookObject, 0)
 
 			for {
 				select {
@@ -57,7 +58,7 @@ func (b *Buffer) run() *Buffer {
 
 					}
 					//TODO this should be done only when there's not an error
-					pending = make([]*WebHookObject, 0)
+					pending = make([]*data.WebHookObject, 0)
 
 					flushTicker = time.NewTicker(b.flushTimeout)
 				case v := <-b.inChan:
@@ -76,7 +77,7 @@ func (b *Buffer) run() *Buffer {
 	return b
 }
 
-func (b *Buffer) Add(item *WebHookObject) bool {
+func (b *ObjectBuffer) Add(item *data.WebHookObject) bool {
 	select {
 	case b.run().inChan <- item:
 		return true
@@ -85,15 +86,15 @@ func (b *Buffer) Add(item *WebHookObject) bool {
 	}
 }
 
-func (b *Buffer) Flush() bool {
+func (b *ObjectBuffer) Flush() bool {
 	return b.signal(b.flushChan)
 }
 
-func (b *Buffer) Close() bool {
+func (b *ObjectBuffer) Close() bool {
 	return b.signal(b.closeChan)
 }
 
-func (b *Buffer) signal(ch chan struct{}) bool {
+func (b *ObjectBuffer) signal(ch chan struct{}) bool {
 	select {
 	case ch <- struct{}{}:
 		return true

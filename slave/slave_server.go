@@ -5,30 +5,26 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/aws/aws-sdk-go/aws/session"
 	"io"
 	"net/http"
 	"time"
 	"webhooks/common"
+	"webhooks/common/app"
 	"webhooks/common/data"
 	"webhooks/common/storage"
 )
 
+var App *app.App
+
+func init() {
+	App = app.AppInitStrict(app.StorageTypeDynamoDb)
+}
+
 func main() {
 
-	sess, err := session.NewSession(&aws.Config{
-		Region:      aws.String("eu-central-1"),
-		Credentials: credentials.NewSharedCredentials("/home/cris/.aws/credentials", "default"),
-	})
-
-	if err != nil {
-		panic(err)
-	}
-
+	http.HandleFunc("/webhook", App.CreateWebHookHttpHandler())
 	http.HandleFunc("/swallow_sync", func(writer http.ResponseWriter, request *http.Request) {
-		replyToSync(request.Context(), request.Body, writer, storage.NewDynamoDbStore(sess, "webhooks"))
+		replyToSync(request.Context(), request.Body, writer, App.Store)
 	})
 	http.ListenAndServe(":8080", nil)
 }
