@@ -30,6 +30,14 @@ func NewObjectIdFromHex(str string) (ObjectID, error) {
 	return objId, nil
 }
 
+func NewObjectIdFromTimestamp(timestamp time.Time, hash uint32) ObjectID {
+	var b [8]byte
+	binary.BigEndian.PutUint32(b[0:4], uint32(timestamp.Unix()))
+	binary.BigEndian.PutUint32(b[4:], hash)
+
+	return b
+}
+
 func (id ObjectID) MarshalJSON() ([]byte, error) {
 	return json.Marshal(id.Hex())
 }
