@@ -1,0 +1,18 @@
+Resources:
+  WebhooksTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: ${self:custom.dynamoTableName}
+      AttributeDefinitions:
+        - AttributeName: date
+          AttributeType: S
+        - AttributeName: object_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: date
+          KeyType: HASH
+        - AttributeName: object_id
+          KeyType: RANGE
+      ProvisionedThroughput:
+        ReadCapacityUnits: 1
+        WriteCapacityUnits: 1

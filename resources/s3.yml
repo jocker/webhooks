@@ -1,0 +1,6 @@
+resources:
+  Resources:
+    WebhookBucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: ${self:custom.s3Bucket}

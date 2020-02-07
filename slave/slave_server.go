@@ -5,7 +5,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/apex/gateway"
 	"io"
+	"log"
 	"net/http"
 	"time"
 	"webhooks/common"
@@ -21,18 +23,19 @@ func init() {
 }
 
 func main() {
-
 	http.HandleFunc("/webhook", App.CreateWebHookHttpHandler())
-	http.HandleFunc("/swallow_sync", func(writer http.ResponseWriter, request *http.Request) {
-		replyToSync(request.Context(), request.Body, writer, App.Store)
-	})
-	http.ListenAndServe(":8080", nil)
-}
+	http.HandleFunc("/master_sync", func(writer http.ResponseWriter, request *http.Request) {
+		err := replyToSync(request.Context(), request.Body, writer, App.Store)
+		if err != nil {
+			common.Logger.WithError(err).Errorf("slave couldn't handle request")
+			writer.WriteHeader(http.StatusInternalServerError)
+		} else {
+			writer.WriteHeader(http.StatusOK)
+		}
 
-type dataSyncRequestT struct {
-	from int
-	to   int
-	ids  []data.ObjectID
+	})
+
+	log.Fatal(gateway.ListenAndServe(":3000", nil))
 }
 
 // takes an input stream containing a master diff request
@@ -43,7 +46,7 @@ type dataSyncRequestT struct {
 // 	- context.cancel stops everything, an error in any of the processors stops everything
 func replyToSync(ctx context.Context, in io.Reader, out io.Writer, store storage.Store) error {
 
-	reqData := dataSyncRequestT{}
+	reqData := common.MasterSyncRequestData{}
 
 	err := json.NewDecoder(in).Decode(reqData)
 	if err != nil {
@@ -53,11 +56,11 @@ func replyToSync(ctx context.Context, in io.Reader, out io.Writer, store storage
 	//TODO other checks can be done here - like checking if the ids are sorted
 
 	// loading all slave ids for the given interval
-	slaveIds, err := loadStorageKeysSync(
+	slaveIds, err := storage.LoadStorageKeysSync(
 		ctx,
 		store,
-		time.Unix(int64(reqData.from), 0),
-		time.Unix(int64(reqData.to), 0),
+		time.Unix(int64(reqData.SlaveRangeStart), 0),
+		time.Unix(int64(reqData.SlaveRangeEnd), 0),
 	)
 
 	if err != nil {
@@ -65,10 +68,10 @@ func replyToSync(ctx context.Context, in io.Reader, out io.Writer, store storage
 	}
 
 	// check which ids are present in slave but not in master
-	missingMasterIds := getDiffIds(reqData.ids, slaveIds, time.Minute)
+	missingMasterIds := getDiffIds(reqData.MasterIds, slaveIds, time.Minute)
 
 	// load the slave objects based on the ids we found above
-	missingMasterObjects, err := loadStorageObjectsSync(ctx, store, missingMasterIds)
+	missingMasterObjects, err := storage.LoadStorageObjectsSync(ctx, store, missingMasterIds)
 
 	if err != nil {
 		return err
@@ -150,46 +153,4 @@ func writeObjects(dest *bytes.Buffer, item *data.WebHookObject) error {
 	dest.WriteString(common.DelimiterObjectEnd.String())
 
 	return nil
-}
-
-func loadStorageKeysSync(ctx context.Context, store storage.Store, rangeStart, rangeEnd time.Time) ([]data.ObjectID, error) {
-	idsChan, errChan := store.Keys(ctx, rangeStart, rangeEnd)
-	res := make([]data.ObjectID, 0)
-	isDone := false
-	for !isDone {
-		select {
-		case id, ok := <-idsChan:
-			if ok {
-				res = append(res, id)
-			} else {
-				isDone = true
-			}
-		case err := <-errChan:
-			if err != nil {
-				return nil, err
-			}
-		}
-	}
-	return res, nil
-}
-
-func loadStorageObjectsSync(ctx context.Context, store storage.Store, ids []data.ObjectID) ([]*data.WebHookObject, error) {
-	idsChan, errChan := store.Objects(ctx, ids)
-	res := make([]*data.WebHookObject, 0)
-	isDone := false
-	for !isDone {
-		select {
-		case id, ok := <-idsChan:
-			if ok {
-				res = append(res, id)
-			} else {
-				isDone = true
-			}
-		case err := <-errChan:
-			if err != nil {
-				return nil, err
-			}
-		}
-	}
-	return res, nil
 }

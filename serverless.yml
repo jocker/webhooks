@@ -1,0 +1,84 @@
+service: webhooks
+
+custom:
+  dynamoTableName: ${opt:dynamo, 'webhooks'}
+  s3Bucket: ${opt:s3bucket, 'webooks-data'}
+  region: ${opt:region, 'eu-central-1'}
+
+package:
+  exclude:
+    - ./**
+  include:
+    - ./bin/**
+
+provider:
+  name: aws
+  runtime: go1.x
+  region: ${self:custom.region}
+  environment:
+    REGION: ${self:custom.region}
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - dynamodb:PutItem
+        - dynamodb:GetItem
+        - dynamodb:DescribeTable
+        - dynamodb:UpdateItem
+        - dynamodb:UpdateTimeToLive
+        - dynamodb:Scan
+        - dynamodb:DescribeTable
+        - dynamodb:DescribeTimeToLive
+        - dynamodb:DeleteItem
+        - dynamodb:BatchWriteItem
+        - dynamodb:BatchGetItem
+        - s3:PutObject
+        - s3:GetObject
+        - s3:ListBucket
+      Resource:
+        - "Fn::GetAtt": [ WebhooksTable, WebhookBucket, Arn ]
+
+functions:
+  slave-webhook:
+    handler: bin/slave
+    environment:
+      REGION: ${self:custom.region}
+      S3_BUCKET: ${self:custom.dynamoTableName}
+    events:
+      - http:
+          path: /webhook
+          method: post
+  slave-master-sync:
+    handler: bin/slave
+    environment:
+      REGION: ${self:custom.region}
+      S3_BUCKET: ${self:custom.dynamoTableName}
+    events:
+      - http:
+          path: /master_sync
+          method: post
+
+  master-webhook:
+    handler: bin/master
+    environment:
+      REGION: ${self:custom.region}
+      DYNAMO_TABLE: ${self:custom.s3Bucket}
+    events:
+      - http:
+          path: /webhook
+          method: post
+  master-trigger-sync:
+    handler: bin/master
+    environment:
+      REGION: ${self:custom.region}
+      DYNAMO_TABLE: ${self:custom.dynamoTableName}
+    events:
+      - http:
+          path: /trigger_sync
+          method: post
+      - schedule: rate(2 minutes)
+
+resources:
+  # DynamoDB
+  - ${file(resources/dynamodb-table.yml)}
+  # S3
+  - ${file(resources/s3.yml)}
