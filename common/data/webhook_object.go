@@ -1,6 +1,8 @@
 package data
 
 import (
+	"crypto/md5"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"time"
@@ -30,4 +32,14 @@ func (this WebHookObject) Timestamp() time.Time {
 
 func (this WebHookObject) UnixTimestamp() int64 {
 	return this.ID.Timestamp().Unix()
+}
+
+func (this WebHookObject) Md5() string {
+	if this.JsonData == nil {
+		return ""
+	}
+	h := md5.New()
+	h.Write(this.JsonData)
+
+	return base64.StdEncoding.EncodeToString(h.Sum(nil))
 }
