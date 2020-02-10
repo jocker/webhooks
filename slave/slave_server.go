@@ -19,7 +19,7 @@ import (
 var App *app.App
 
 func init() {
-	App = app.AppInitStrict(app.StorageTypeDynamoDb)
+	App = app.AppInitStrict(app.StorageTypeS3)
 }
 
 func main() {
