@@ -1,3 +1,6 @@
+**Review**
+Please review the code from the master branch 
+
 **Project packages**
 - [common](https://github.com/jocker/webhooks/tree/master/common) contains all the code which is common to both slave and master
 - [app](https://github.com/jocker/webhooks/tree/master/common/app) contains the initialization code common to both slave and master
@@ -32,3 +35,4 @@
     - as a fallback, in case the master is down I'd use pub/sub queues  (either sqs from aws, or pub/sub from google, or apache thrift, or kafka, etc)
 - in case the crc32c hash is not enough, we can move to a 64bit one like [xxhash](https://github.com/cespare/xxhash)
 - any processing should be done using streams of data and it shouldn't process all data at once
+
